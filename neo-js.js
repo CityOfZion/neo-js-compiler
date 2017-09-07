@@ -133,6 +133,7 @@
         document.getElementById('byteCodeOutput').innerHTML = jsByteCode;
         let diff = new Diff();
         let textDiff = diff.main(csByteCode, jsByteCode);
+        bcDiv.innerHTML = '';
         if (jsByteCode !== csByteCode) {
           bcDiv.innerHTML += diff.prettyHtml(textDiff) + '<br />'
         }

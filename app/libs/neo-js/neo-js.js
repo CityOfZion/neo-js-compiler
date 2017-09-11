@@ -183,8 +183,6 @@
             neo.methods[node.id.name].functionArguments.push(functionParamObject);
             neo.methods[node.id.name].functionVariables[node.params[n].name] = functionParamObject;
           }
-          // this.FunctionDefinitionFinder(neo.methods[node.id.name], node.body);
-          // return;
         } else {
           console.log(neo.methods[node.id.name]);
           neo.methods[node.id.name].sourceOperations = 0;
@@ -236,34 +234,6 @@
           }
         }
         //ConvertAddrInMethod end
-      },
-
-      /**
-       * scan this function looking for any kind of 'return' statement - required to add a DROP to stack after calling
-       * @param parentMethod
-       * @param node
-       * @constructor
-       */
-      FunctionDefinitionFinder: function (parentMethod, node) {
-        console.log('FunctionDefinitionFinder()');
-        for (let n = 0; n < node.body.length; n++) {
-          if (node.body[n].type === "ReturnStatement") {
-            if (node.body[n].expression !== null) {
-              parentMethod.totalVars++;
-            }
-            parentMethod.hasReturnStatement = true;
-            return;
-          }
-          if (node.body[n].type === 'VariableDeclaration') {
-            parentMethod.totalVars += node.body[n].declarations.length;
-            for (let i = 0; i < node.body[n].declarations.length; i++) {
-              if (node.body[n].declarations[i].init.type === 'ArrayExpression') {
-                // parentMethod.totalVars += node.body[n].declarations[i].init.elements.length
-              }
-            }
-          }
-        }
-        console.log('FunctionDefinitionFinder(): parentMethod.totalVars: %d', parentMethod.totalVars);
       },
 
       BlockStatement: function (parentMethod, node) {

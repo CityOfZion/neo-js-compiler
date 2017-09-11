@@ -1,0 +1,130 @@
+body {
+    margin: 0;
+    overflow: hidden;
+    font-size: 0.8em;
+    padding: 2px;
+}
+
+button {
+    margin: 0;
+}
+
+.buttons {
+    padding: 2px;
+    height: 25px;
+}
+
+#editor-tabs {
+    margin-top: 5px;
+    margin-left: 1px;
+}
+
+#editor-tabs.tabs a {
+    font-size: 0.7em;
+    border: 1px solid #eaeaea;
+    margin-right: 1px;
+    padding: 0.2em 0.5em 0.2em 0.2em !important;
+}
+
+#editor-tabs .new-doc-tab {
+    background-color: #eaeaea;
+    padding-right: 0em;
+}
+
+#editor-tabs .delete {
+    margin-left: 3px;
+}
+
+#tab-content {
+    position: absolute;
+    bottom: 250px;
+    left: 0;
+    right: 0;
+    top: 32px;
+}
+
+.CodeMirror {
+    margin: 0;
+    padding: 0;
+    height: auto;
+    font-size: 0.8em;
+}
+
+.CodeMirror-scroll {
+    height: auto;
+    overflow-y: hidden;
+    overflow-x: auto;
+}
+
+#editor {
+    position: absolute;
+    font-size: 0.7em;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: #262626;
+}
+
+.info {
+    font-family: monospace;
+    white-space: nowrap;
+    position: absolute;
+    bottom: 0;
+    background: #eee;
+    padding: 2px;
+    height: 250px;
+    left: 0;
+    right: 0;
+}
+
+.info label {
+    font-weight: bold;
+}
+
+.is-smallest {
+    height: 12px;
+    width: 12px;
+    max-height: 12px;
+    max-width: 12px;
+    min-height: 12px;
+    min-width: 12px;
+}
+
+.hidden {
+    display: none;
+}
+
+/*******************************/
+#byteCodeDiff {
+    margin-bottom: 1px;
+    font-size: 12px;
+    right: 0;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    white-space: normal;
+}
+
+#byteCodeDiff DEL {
+    background-color: #aa8790;
+}
+
+#byteCodeDiff INS {
+    background-color: #6daa68;
+}
+
+#byteCodeInput {
+    height: 15px;
+    font-size: 12px;
+    width: 100%;
+}
+
+.error {
+    color: #a00000;
+}
+
+TEXTAREA {
+    width: 100%;
+    height: 50px
+}

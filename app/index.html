@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>NEO Javscript Editor</title>
+
+    <script src="js/zepto.min.js"></script>
+    <script src="libs/neo-js/neo-js.js"></script>
+    <script src="js/editor.js"></script>
+    <script src="js/neo-code-hint.js"></script>
+
+    <link rel="stylesheet" href="../node_modules/bulma/css/bulma.css">
+    <link rel="stylesheet" href="../node_modules/font-awesome/css/font-awesome.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="../node_modules/codemirror/lib/codemirror.css">
+    <link rel="stylesheet" href="../node_modules/codemirror/theme/lesser-dark.css">
+    <link rel="stylesheet" href="../node_modules/codemirror/addon/hint/show-hint.css">
+</head>
+<body>
+<div id="tab-template" class="hidden">
+    <li><a>
+        <span class="icon is-small"><i class="fa fa-file-text-o"></i></span>
+        <span class="tab-title">Untitled</span>
+        <span class="delete is-smallest"></span></a></li>
+</div>
+
+<div id="editor-tabs" class="tabs is-boxed ">
+    <ul>
+        <li class="new-doc-tab">
+            <a title="New Document">
+                <span class="icon is-small"><i class="fa fa-plus"></i></span>
+            </a>
+        </li>
+    </ul>
+    <div id="tab-content">
+    </div>
+</div>
+
+
+<div class="info" style="">
+    <span id="byteCodeDiff"></span>
+    <div class="field">
+        <div class="control">
+            <textarea class="textarea is-small" rows="3" type="text" placeholder="" id="jsByteCode"></textarea>
+            <textarea class="textarea is-small" rows="3" type="text" placeholder="" id="csByteCode"></textarea>
+        </div>
+    </div>
+</div>
+
+<div id="confirm-dialog" class="modal">
+    <div class="modal-background"></div>
+    <div class="modal-card">
+        <header class="modal-card-head">
+            <p class="modal-card-title">Title</p>
+            <button class="delete" aria-label="close" data-response="0"></button>
+        </header>
+        <section class="modal-card-body">
+        </section>
+        <footer class="modal-card-foot">
+            <button class="button is-success" data-response="1">OK</button>
+            <button class="button is-danger" data-response="0">Cancel</button>
+        </footer>
+    </div>
+</div>
+</body>
+</html>

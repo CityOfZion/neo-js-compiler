@@ -48,6 +48,11 @@
   function neoParser() {
     return {
       parse: function (jsSource) {
+        console.log(this);
+        neo.methods = {};
+        neo.stack = {};
+        neo.sourceNodes = {};
+
         neo.sourceNodes = acorn.parse(jsSource, {
           sourceType: "module",
         });
@@ -123,21 +128,27 @@
         }
 
         let jsByteCode = byteCodeOutput.join(" ").toLowerCase().replace(new RegExp('0x', 'g'), '');
-        let bcDiv = document.getElementById('byteCode');
-        let csByteCode = "53 c5 6b 61 04 61 61 61 61 6c 76 6b 00 52 7a c4 04 62 62 62 62 6c 76 6b 51 52 7a c4 02 d7 03 6c 76 6b 52 52 7a c4 6c 76 6b 00 c3 61 65 54 00 75 6c 76 6b 00 c3 6c 76 6b 51 c3 61 7c 65 67 00 75 04 63 63 63 63 61 65 3a 00 75 6c 76 6b 00 c3 04 64 64 64 64 61 7c 65 4d 00 75 61 65 72 00 75 61 65 89 00 75 6c 76 6b 52 c3 61 65 9a 00 75 03 ec a8 00 61 65 91 00 75 61 65 af 00 75 61 6c 75 66 52 c5 6b 6c 76 6b 00 52 7a c4 61 6c 76 6b 00 c3 6c 76 6b 51 52 7a c4 62 03 00 6c 76 6b 51 c3 61 6c 75 66 53 c5 6b 6c 76 6b 00 52 7a c4 6c 76 6b 51 52 7a c4 61 6c 76 6b 51 c3 6c 76 6b 52 52 7a c4 62 03 00 6c 76 6b 52 c3 61 6c 75 66 51 c5 6b 61 04 74 65 73 74 6c 76 6b 00 52 7a c4 62 03 00 6c 76 6b 00 c3 61 6c 75 66 51 c5 6b 61 61 65 df ff 6c 76 6b 00 52 7a c4 62 03 00 6c 76 6b 00 c3 61 6c 75 66 52 c5 6b 6c 76 6b 00 52 7a c4 61 6c 76 6b 00 c3 6c 76 6b 51 52 7a c4 62 03 00 6c 76 6b 51 c3 61 6c 75 66 51 c5 6b 61 01 20 6c 76 6b 00 52 7a c4 62 03 00 6c 76 6b 00 c3 61 6c 75 66";
-        csByteCode = csByteCode.trim();
-        if (csByteCode === '') {
-          return;
+        let jsBC = $('#jsByteCode');
+        let csBC = $('#csByteCode');
+        // let bcDiv = document.getElementById('byteCode');
+        // let csByteCode = "53 c5 6b 61 04 61 61 61 61 6c 76 6b 00 52 7a c4 04 62 62 62 62 6c 76 6b 51 52 7a c4 02 d7 03 6c 76 6b 52 52 7a c4 6c 76 6b 00 c3 61 65 54 00 75 6c 76 6b 00 c3 6c 76 6b 51 c3 61 7c 65 67 00 75 04 63 63 63 63 61 65 3a 00 75 6c 76 6b 00 c3 04 64 64 64 64 61 7c 65 4d 00 75 61 65 72 00 75 61 65 89 00 75 6c 76 6b 52 c3 61 65 9a 00 75 03 ec a8 00 61 65 91 00 75 61 65 af 00 75 61 6c 75 66 52 c5 6b 6c 76 6b 00 52 7a c4 61 6c 76 6b 00 c3 6c 76 6b 51 52 7a c4 62 03 00 6c 76 6b 51 c3 61 6c 75 66 53 c5 6b 6c 76 6b 00 52 7a c4 6c 76 6b 51 52 7a c4 61 6c 76 6b 51 c3 6c 76 6b 52 52 7a c4 62 03 00 6c 76 6b 52 c3 61 6c 75 66 51 c5 6b 61 04 74 65 73 74 6c 76 6b 00 52 7a c4 62 03 00 6c 76 6b 00 c3 61 6c 75 66 51 c5 6b 61 61 65 df ff 6c 76 6b 00 52 7a c4 62 03 00 6c 76 6b 00 c3 61 6c 75 66 52 c5 6b 6c 76 6b 00 52 7a c4 61 6c 76 6b 00 c3 6c 76 6b 51 52 7a c4 62 03 00 6c 76 6b 51 c3 61 6c 75 66 51 c5 6b 61 01 20 6c 76 6b 00 52 7a c4 62 03 00 6c 76 6b 00 c3 61 6c 75 66";
+        let csByteCode = csBC.val().trim();
+        console.log(csByteCode);
+        jsBC.val(jsByteCode);
+        jsBC.removeClass('is-danger');
+        jsBC.removeClass('is-success');
+        if (jsByteCode !== csByteCode) {
+          jsBC.addClass('is-danger');
+        } else {
+          jsBC.addClass('is-success');
         }
-
-        document.getElementById('byteCodeOutput').innerHTML = jsByteCode;
+        // if (csByteCode === '') {
+        //   return;
+        // }
+        //
         let diff = new Diff();
         let textDiff = diff.main(csByteCode, jsByteCode);
-        bcDiv.innerHTML = '';
-        if (jsByteCode !== csByteCode) {
-          bcDiv.innerHTML += diff.prettyHtml(textDiff) + '<br />'
-        }
-        bcDiv.innerHTML += csByteCode;
+        $('#byteCodeDiff').html(diff.prettyHtml(textDiff));
       },
 
       FunctionDeclaration: function (node, justInitFunctionDeclarations) {
@@ -158,7 +169,7 @@
             totalFunctionArgs: node.params.length,
             byteCodeAddress: 0,
             hasReturnStatement: false,
-            operations: [],
+            firstRun: true,
             stack: [],
           };
 
@@ -172,9 +183,18 @@
             neo.methods[node.id.name].functionArguments.push(functionParamObject);
             neo.methods[node.id.name].functionVariables[node.params[n].name] = functionParamObject;
           }
-
-          this.FunctionDefinitionFinder(neo.methods[node.id.name], node.body);
-          return;
+          // this.FunctionDefinitionFinder(neo.methods[node.id.name], node.body);
+          // return;
+        } else {
+          console.log(neo.methods[node.id.name]);
+          neo.methods[node.id.name].sourceOperations = 0;
+          neo.methods[node.id.name].address = 0;
+          neo.methods[node.id.name].addressConvert = {};
+          neo.methods[node.id.name].varCount = 0;
+          neo.methods[node.id.name].totalFunctionArgs = node.params.length;
+          neo.methods[node.id.name].byteCodeAddress = 0;
+          neo.methods[node.id.name].stack = [];
+          neo.methods[node.id.name].firstRun = false;
         }
 
         let functionStack = neo.methods[node.id.name];
@@ -236,8 +256,14 @@
           }
           if (node.body[n].type === 'VariableDeclaration') {
             parentMethod.totalVars += node.body[n].declarations.length;
+            for (let i = 0; i < node.body[n].declarations.length; i++) {
+              if (node.body[n].declarations[i].init.type === 'ArrayExpression') {
+                // parentMethod.totalVars += node.body[n].declarations[i].init.elements.length
+              }
+            }
           }
         }
+        console.log('FunctionDefinitionFinder(): parentMethod.totalVars: %d', parentMethod.totalVars);
       },
 
       BlockStatement: function (parentMethod, node) {
@@ -269,6 +295,8 @@
 
       ReturnStatement: function (parentMethod, expression) {
         console.error('ReturnStatement()');
+        parentMethod.hasReturnStatement = true;
+
         if (expression !== null) {
           this.VariableAssignment(parentMethod, expression);
         }
@@ -284,6 +312,18 @@
         this.ConvertPushNumber(parentMethod, (parentMethod.totalFunctionArgs + parentMethod.totalVars) - 1);
         this.ConvertPushOne(parentMethod, opCodes.PICKITEM);
 
+
+      },
+
+      IncrementMethodTotalVars: function (parentMethod) {
+        if (parentMethod.firstRun) {
+          console.log('IncrementMethodTotalVars: %s / %d', parentMethod.methodName, parentMethod.totalVars);
+          parentMethod.totalVars++;
+        }
+      },
+      IncrementMethodVarCount: function (parentMethod) {
+        console.log('IncrementMethodVarCount: %s / %d', parentMethod.methodName, parentMethod.varCount);
+        parentMethod.varCount++;
       },
 
       ExpressionStatement: function (parentMethod, expression) {
@@ -292,9 +332,60 @@
           case "CallExpression":
             this.CallExpression(parentMethod, expression);
             break;
+          case "AssignmentExpression":
+            this.AssignmentExpression(parentMethod, expression);
+            break;
           default:
             console.error('ExpressionStatement() unhandled: %s', expression.type);
         }
+      },
+
+      AssignmentExpression: function (parentMethod, expression) {
+        console.log(expression);
+        console.log(parentMethod.functionVariables);
+        switch (expression.operator) {
+          case "=":
+            if (expression.left.type === "MemberExpression") {
+              // an array or object
+              let assignmentVarName = expression.left.object.name;
+              parentMethod.functionVariables[assignmentVarName].value[expression.left.property.raw] = expression.right.value;
+              this.ConvertPushOne(parentMethod, opCodes.FROMALTSTACK, parentMethod.sourceOperations++);
+              this.ConvertPushOne(parentMethod, opCodes.DUP);
+              this.ConvertPushOne(parentMethod, opCodes.TOALTSTACK);
+              this.ConvertPushNumber(parentMethod, parentMethod.functionVariables[assignmentVarName].pos + parentMethod.totalFunctionArgs);
+              this.ConvertPushOne(parentMethod, opCodes.PICKITEM);
+              this.ConvertPushNumber(parentMethod, parseInt(expression.left.property.raw));
+            }
+
+            switch (typeof(expression.right.value)) {
+              case "string":
+                this.ConvertPushArray(parentMethod, this.StringToByteArray(expression.right.value));
+                break;
+              case "number":
+                console.log("AssignmentExpression() logging number: %s", expression.right.value);
+                this.ConvertPushNumber(parentMethod, expression.right.value, parentMethod.sourceOperations++);
+                break;
+              case "boolean":
+                console.log("AssignmentExpression() logging boolean: %s", expression.right.value);
+                this.ConvertPushNumber(parentMethod, expression.right.value ? 1 : 0, parentMethod.sourceOperations++);
+                break;
+            }
+            if (expression.left.type === "Identifier") {
+              parentMethod.functionVariables[expression.left.name].value = expression.right.value;
+              this.ConvertPushOne(parentMethod, opCodes.FROMALTSTACK, parentMethod.sourceOperations++);
+              this.ConvertPushOne(parentMethod, opCodes.DUP);
+              this.ConvertPushOne(parentMethod, opCodes.TOALTSTACK);
+              this.ConvertPushNumber(parentMethod, parentMethod.functionVariables[expression.left.name].pos + parentMethod.totalFunctionArgs);
+              this.ConvertPushNumber(parentMethod, 2);
+              this.ConvertPushOne(parentMethod, opCodes.ROLL);
+            }
+
+            this.ConvertPushOne(parentMethod, opCodes.SETITEM, parentMethod.sourceOperations++);
+            break;
+          default:
+            console.error('ExpressionStatement() AssignmentExpression unhandled operator: %s', expression.operator);
+        }
+
       },
 
       CallExpression: function (parentMethod, callExpression, assignReturnValue = false) {
@@ -307,8 +398,8 @@
           if (numArgs > 0) {
             // let identifiersAdded = 0;
             for (let i = 0; i < numArgs; i++) {
-              console.error('expression args');
               let expr = callExpression.arguments[i];
+              console.error('expression args with type: %s', expr.type);
               switch (expr.type) {
                 case "Identifier":
                   neo.methods[callExpression.callee.name].functionArguments[i].value = parentMethod.functionVariables[expr.name].value;
@@ -330,7 +421,16 @@
                     case "string":
                       this.ConvertPushArray(parentMethod, this.StringToByteArray(expr.value));
                       break;
+                    case "boolean":
+                      console.log("CallExpression() logging boolean: %s", expr.value);
+                      this.ConvertPushNumber(parentMethod, expr.value ? 1 : 0, parentMethod.sourceOperations++);
+                      break;
+                    default:
+                      console.error('CallExpression() unhandled expression value: %s', typeof(expr.value));
                   }
+                  break;
+                default:
+                  console.error('CallExpression() unhandled expression type: %s', typeof(expr.type));
                   break;
               }
             }
@@ -386,7 +486,7 @@
         console.error('VariableDeclaration() called with %d declarations', declarations.length);
         for (let i = 0; i < declarations.length; i++) {
           let varPosition = parentMethod.varCount;
-          let returnValue = this.VariableAssignment(parentMethod, declarations[i].init);
+          let returnValue = this.VariableAssignment(parentMethod, declarations[i].init, declarations[i].id.name);
           parentMethod.functionVariables[declarations[i].id.name] = {
             pos: varPosition,
             value: returnValue,
@@ -396,12 +496,13 @@
         }
       },
 
-      VariableAssignment: function (parentMethod, variable) {
+      VariableAssignment: function (parentMethod, variable, variableName = null) {
         console.error('VariableAssignment()');
         let returnValue = "";
+        this.IncrementMethodTotalVars(parentMethod);
 
         if (variable === null) {
-          parentMethod.varCount++;
+          this.IncrementMethodVarCount(parentMethod);
           return;
         }
         switch (variable.type) {
@@ -415,8 +516,55 @@
                 console.log("VariableAssignment() logging number: %d", variable.value);
                 this.ConvertPushNumber(parentMethod, variable.value, parentMethod.sourceOperations++);
                 break;
+              case "boolean":
+                console.log("VariableAssignment() logging boolean: %s", variable.value);
+                this.ConvertPushNumber(parentMethod, variable.value ? 1 : 0, parentMethod.sourceOperations++);
+                break;
+              default:
+                console.error('VariableAssignment() unhandled expression type: %s', typeof(variable.value));
+                console.log(variable);
             }
             returnValue = variable.value;
+            break;
+          case "ArrayExpression":
+            console.error('VariableAssignment() ArrayExpression');
+            console.log(variable);
+            //_ConvertNewArr
+            let arrayLength = variable.elements.length;
+            if (!parentMethod.firstRun) {
+              arrayLength = parentMethod.functionVariables[variableName].value.length;
+            }
+            console.log('array length is: %d', arrayLength);
+            this.ConvertPushNumber(parentMethod, arrayLength);
+            this.ConvertPushOne(parentMethod, opCodes.NEWARRAY, parentMethod.sourceOperations++);
+            console.log(variable.elements);
+            returnValue = [];
+            for (let n = 0; n < variable.elements.length; n++) {
+              this.ConvertPushOne(parentMethod, opCodes.DUP, parentMethod.sourceOperations++);
+              this.ConvertPushNumber(parentMethod, n);
+              returnValue.push(variable.elements[n].value);
+              console.log('pushing var?');
+              console.log(parentMethod);
+              console.log(variable.elements[n]);
+              switch (typeof(variable.elements[n].value)) {
+                case "string":
+                  this.ConvertPushArray(parentMethod, this.StringToByteArray(variable.elements[n].value), parentMethod.sourceOperations++);
+                  break;
+                case "number":
+                  console.log("ArrayExpression() logging number: %d", variable.elements[n].value);
+                  this.ConvertPushNumber(parentMethod, variable.elements[n].value, parentMethod.sourceOperations++);
+                  break;
+                case "boolean":
+                  console.log("ArrayExpression() logging boolean: %s", variable.elements[n].value);
+                  this.ConvertPushNumber(parentMethod, variable.elements[n].value ? 1 : 0, parentMethod.sourceOperations++);
+                  break;
+                default:
+                  console.error('ArrayExpression() unhandled expression type: %s', typeof(variable.elements[n].value));
+                  console.log(variable);
+              }
+              this.ConvertPushOne(parentMethod, opCodes.SETITEM, parentMethod.sourceOperations++);
+              // parentMethod.varCount--;
+            }
             break;
           case "CallExpression":
             this.CallExpression(parentMethod, variable, true);
@@ -438,10 +586,13 @@
             }
             this.ConvertPushOne(parentMethod, opCodes.PICKITEM);
             break;
-          case "BinaryExpressionZZ":
+          case "BinaryExpression":
+            console.log(variable);
+            this.BinaryExpression(parentMethod, variable);
             break;
           default:
             console.error('VariableAssignment() unhandled: %s', variable.type);
+            console.log(variable);
             return;
         }
 
@@ -449,17 +600,24 @@
         this.ConvertPushOne(parentMethod, opCodes.FROMALTSTACK, parentMethod.sourceOperations++);
         this.ConvertPushOne(parentMethod, opCodes.DUP);
         this.ConvertPushOne(parentMethod, opCodes.TOALTSTACK);
-        this.ConvertPushNumber(parentMethod, (parentMethod.varCount + parentMethod.totalFunctionArgs));
+        let variableIndex = parentMethod.varCount + parentMethod.totalFunctionArgs;
+        console.log('variable index %d', variableIndex);
+        this.ConvertPushNumber(parentMethod, variableIndex);
         this.ConvertPushNumber(parentMethod, 2);
         this.ConvertPushOne(parentMethod, opCodes.ROLL);
         this.ConvertPushOne(parentMethod, opCodes.SETITEM);
 
-        parentMethod.varCount++;
+        this.IncrementMethodVarCount(parentMethod);
+
         return returnValue;
       },
 
+      BinaryExpression: function (parentMethod, variable) {
+        console.error(variable);
+      },
+
       ConvertPushOne: function (parentMethod, mCode, mSourceOperations = null, mExtraData = null) {
-        console.error('ConvertPushOne() %s', mCode);
+        // console.error('ConvertPushOne() %s', mCode);
         let startAddress = parentMethod.address;
 
         let code = {
@@ -490,7 +648,7 @@
         return code;
       },
       ConvertPushNumber: function (parentMethod, mValue, mSourceOperations) {
-        console.error('ConvertPushNumber() ' + mValue);
+        // console.error('ConvertPushNumber() ' + mValue);
         if (mValue === 0) {
           return this.ConvertPushOne(parentMethod, opCodes.PUSH0, mSourceOperations);
         } else if (mValue === -1) {
@@ -615,7 +773,7 @@
       },
 
       HexByteArrayNumBits: function (mArray, bits = 0) {
-        if(typeof(mArray[0]) === 'object') {
+        if (typeof(mArray[0]) === 'object') {
           mArray = mArray[0];
         }
         for (let i = mArray.length; i < bits; i++) {
@@ -630,14 +788,14 @@
       IntToHex: function (mNumber, useMSB = true) {
         // worst way to do twos complement D:
 
-        if(mNumber < 0) {
+        if (mNumber < 0) {
           return this.HexToByteArray((65535 + mNumber + 1).toString(16)).reverse();
         }
 
         let h = mNumber.toString(16);
         let val = h.length % 2 ? '0' + h : h;
-        let msb = {8:1,9:1,a:1,b:1,c:1,d:1,e:1,f:1};
-        if(useMSB && mNumber > 127 && typeof(msb[val.substr(0,1)]) !== 'undefined') {
+        let msb = {8: 1, 9: 1, a: 1, b: 1, c: 1, d: 1, e: 1, f: 1};
+        if (useMSB && mNumber > 127 && typeof(msb[val.substr(0, 1)]) !== 'undefined') {
           val = '00' + val;
         }
         return val;

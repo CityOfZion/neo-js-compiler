@@ -153,7 +153,7 @@
 
       FunctionDeclaration: function (node, justInitFunctionDeclarations) {
         console.log('FunctionDeclaration(%s) called: %s (range: %s)', justInitFunctionDeclarations, node.id.name, JSON.stringify(this.NodeRange(node)));
-
+        let totalVarCount = 0;
         if (justInitFunctionDeclarations) {
           // only initialise the function list, this happens so that we can determine
           // defined functions in main body before processing and to also determine return type (if any)
@@ -184,6 +184,7 @@
             neo.methods[node.id.name].functionVariables[node.params[n].name] = functionParamObject;
           }
         } else {
+          totalVarCount = neo.methods[node.id.name].varCount + neo.methods[node.id.name].totalFunctionArgs;
           console.log(neo.methods[node.id.name]);
           neo.methods[node.id.name].sourceOperations = 0;
           neo.methods[node.id.name].address = 0;
@@ -198,7 +199,9 @@
         let functionStack = neo.methods[node.id.name];
         //_insertBeginCode
         console.error('%s has %d vars', functionStack.methodName, functionStack.totalVars);
-        this.InsertPushNumber(functionStack, (functionStack.totalVars + functionStack.totalFunctionArgs));
+        console.error('%d vars', totalVarCount);
+        console.log(functionStack);
+        this.InsertPushNumber(functionStack, (totalVarCount));
         this.InsertPushOne(functionStack, opCodes.NEWARRAY);
         this.InsertPushOne(functionStack, opCodes.TOALTSTACK);
 
@@ -257,10 +260,119 @@
             case "ReturnStatement":
               this.ReturnStatement(parentMethod, childNode.argument);
               break;
+            case "IfStatement":
+              console.error('BlockStatement() IfStatement');
+              console.log(childNode);
+              this.IfStatement(parentMethod, childNode);
+              break;
             default:
               console.error('BlockStatement() unhandled: %s', childNode.type);
+              console.log(childNode);
           }
         }
+      },
+
+      IfStatement: function (parentMethod, expression) {
+        console.error("IfStatement()");
+
+        // alternate: false action
+        // consequent: true action
+        // test: condition
+        let testResult = this.TestConditionalStatement(parentMethod, expression.test);
+
+        console.log('test result was %s', testResult);
+        if (expression.consequent.body.length === 0) {
+          if(testResult) {
+            this.ConvertPushOne(parentMethod, opCodes.NOP, parentMethod.sourceOperations++);
+          }
+          if(expression.test.type === 'Literal' && testResult) {
+            this.ConvertPushOne(parentMethod, opCodes.NOP, parentMethod.sourceOperations++);
+          } else {
+            let code = this.ConvertPushOne(parentMethod, opCodes.JMP, parentMethod.sourceOperations++, [this.IntToHex(0), this.IntToHex(0)]);
+            code.fixAddress = true;
+            code.sourceAddress = parentMethod.sourceOperations - 1;
+          }
+        }
+
+        if (expression.alternate === null && !testResult) {
+          // alternate else is not defined at all, add a nop
+          //   this.ConvertPushOne(parentMethod, opCodes.NOP, parentMethod.sourceOperations++);
+        } else if (expression.alternate !== null && expression.alternate.body.length === 0) {
+          // else is defined but is empty
+          if(!testResult) {
+            this.ConvertPushOne(parentMethod, opCodes.NOP, parentMethod.sourceOperations++);
+          }
+          if(expression.test.type === 'Literal' && !testResult) {
+            this.ConvertPushOne(parentMethod, opCodes.NOP, parentMethod.sourceOperations++);
+          } else {
+            let code = this.ConvertPushOne(parentMethod, opCodes.JMP, parentMethod.sourceOperations++, [this.IntToHex(0), this.IntToHex(0)]);
+            code.fixAddress = true;
+            code.sourceAddress = parentMethod.sourceOperations - 1;
+          }
+        }
+      },
+
+      TestConditionalStatement: function (parentMethod, conditional) {
+        console.error("TestConditionalStatement()");
+        console.log(conditional);
+        let testHasLeft, testHasRight, leftTest, rightTest;
+        let testResult = false;
+
+        testHasLeft = typeof(conditional.left) !== 'undefined';
+        testHasRight = typeof(conditional.right) !== 'undefined';
+        console.log(conditional.left);
+        console.log(conditional.right);
+        let testCondition = false;
+
+        if (typeof(conditional.type) !== 'undefined') {
+          switch (conditional.type) {
+            case "LogicalExpression":
+              leftTest = this.TestConditionalStatement(parentMethod, conditional.left);
+              rightTest = this.TestConditionalStatement(parentMethod, conditional.right);
+              switch (conditional.operator) {
+                case "&&":
+                  testCondition = leftTest && rightTest;
+                  break;
+                case "||":
+                  testCondition = leftTest || rightTest;
+                  break;
+                default:
+                  alert('unhandled logical expression operator: ' + conditional.operator);
+              }
+              console.error("LogicalExpression()");
+              console.log(conditional);
+              break;
+            case "UnaryExpression":
+              console.error("UnaryExpression()");
+              console.log(conditional);
+              break;
+            case "Identifier":
+              let conditionVar = parentMethod.functionVariables[conditional.name];
+              testCondition = conditionVar.value;
+              break;
+            case "Literal":
+              console.log("Literal - adding var count");
+              testResult = conditional.value;
+              this.ConvertPushOne(parentMethod, conditional.value ? opCodes.PUSH1 : opCodes.PUSH0, parentMethod.sourceOperations++);
+              console.log('var count is %d', parentMethod.varCount);// parentMethod.varCount++;
+              this.ConvertPushOne(parentMethod, opCodes.FROMALTSTACK, parentMethod.sourceOperations++);
+              this.ConvertPushOne(parentMethod, opCodes.DUP);
+              this.ConvertPushOne(parentMethod, opCodes.TOALTSTACK);
+              console.log(parentMethod);
+              this.ConvertPushNumber(parentMethod, parentMethod.varCount++ + parentMethod.totalFunctionArgs);
+              this.ConvertPushNumber(parentMethod, 2);
+              this.ConvertPushOne(parentMethod, opCodes.ROLL);
+              this.ConvertPushOne(parentMethod, opCodes.SETITEM);
+
+              break;
+          }
+        } else {
+          // not a condition with a type, must be literal
+
+          console.error('unhandled conditional type: %s', conditional.type);
+          console.log(conditional);
+        }
+        return testResult;
       },
 
       ReturnStatement: function (parentMethod, expression) {
@@ -513,7 +625,6 @@
               this.ConvertPushOne(parentMethod, opCodes.DUP, parentMethod.sourceOperations++);
               this.ConvertPushNumber(parentMethod, n);
               returnValue.push(variable.elements[n].value);
-              console.log('pushing var?');
               console.log(parentMethod);
               console.log(variable.elements[n]);
               switch (typeof(variable.elements[n].value)) {
@@ -587,7 +698,7 @@
       },
 
       ConvertPushOne: function (parentMethod, mCode, mSourceOperations = null, mExtraData = null) {
-        // console.error('ConvertPushOne() %s', mCode);
+        console.error('ConvertPushOne() %s', mCode);
         let startAddress = parentMethod.address;
 
         let code = {
@@ -618,7 +729,7 @@
         return code;
       },
       ConvertPushNumber: function (parentMethod, mValue, mSourceOperations) {
-        // console.error('ConvertPushNumber() ' + mValue);
+        console.error('ConvertPushNumber() ' + mValue);
         if (mValue === 0) {
           return this.ConvertPushOne(parentMethod, opCodes.PUSH0, mSourceOperations);
         } else if (mValue === -1) {

@@ -7,3 +7,4 @@ __2017-09-11__
 * added some test files to samples/ which also includes the expected bytecode from the equivalent c# contract source code.
 * compiler now supports arrays (emulating object[] arrays) declaration, assignments and usage as a method argument (note: neos c# compiler doesn't like array initialisation for integers so I'm unable to completely support that at the moment.)
 * compiler now supports boolean declarations, assignments and usage as a method argument.
+* added preliminary support for literal, empty if/else conditionals (this will likely be refactored as further conditional operators are supported)

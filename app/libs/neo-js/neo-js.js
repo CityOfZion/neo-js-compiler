@@ -42,6 +42,7 @@
       stack: {},
       sourceNodes: {},
       parser: neoParser(),
+      opCodeDescs: null,
     };
   }
 
@@ -51,7 +52,6 @@
         console.log(this);
         neo.methods = {};
         neo.stack = {};
-        neo.sourceNodes = {};
 
         neo.sourceNodes = acorn.parse(jsSource, {
           sourceType: "module",
@@ -119,7 +119,6 @@
             // opCodes.CALL requires address rewrite after stack is determined
             let targetAddress = neo.methods[byteCode[n].targetAddress.methodName].byteCodeAddress;
             console.error('%s target address is %s / n is %d / %d (%s)', byteCode[n].targetAddress.methodName, targetAddress, n, targetAddress - n, this.IntToHex(targetAddress - n));
-            // this is a pretty hacky way to work out the new address for the called method.. but it works..
             let newAddress = this.HexByteArrayNumBits([this.IntToHex(targetAddress - n, false)], 2);
             byteCode[n + 1].code = '0x' + newAddress[0];
             byteCode[n + 2].code = '0x' + newAddress[1];
@@ -130,8 +129,6 @@
         let jsByteCode = byteCodeOutput.join(" ").toLowerCase().replace(new RegExp('0x', 'g'), '');
         let jsBC = $('#jsByteCode');
         let csBC = $('#csByteCode');
-        // let bcDiv = document.getElementById('byteCode');
-        // let csByteCode = "53 c5 6b 61 04 61 61 61 61 6c 76 6b 00 52 7a c4 04 62 62 62 62 6c 76 6b 51 52 7a c4 02 d7 03 6c 76 6b 52 52 7a c4 6c 76 6b 00 c3 61 65 54 00 75 6c 76 6b 00 c3 6c 76 6b 51 c3 61 7c 65 67 00 75 04 63 63 63 63 61 65 3a 00 75 6c 76 6b 00 c3 04 64 64 64 64 61 7c 65 4d 00 75 61 65 72 00 75 61 65 89 00 75 6c 76 6b 52 c3 61 65 9a 00 75 03 ec a8 00 61 65 91 00 75 61 65 af 00 75 61 6c 75 66 52 c5 6b 6c 76 6b 00 52 7a c4 61 6c 76 6b 00 c3 6c 76 6b 51 52 7a c4 62 03 00 6c 76 6b 51 c3 61 6c 75 66 53 c5 6b 6c 76 6b 00 52 7a c4 6c 76 6b 51 52 7a c4 61 6c 76 6b 51 c3 6c 76 6b 52 52 7a c4 62 03 00 6c 76 6b 52 c3 61 6c 75 66 51 c5 6b 61 04 74 65 73 74 6c 76 6b 00 52 7a c4 62 03 00 6c 76 6b 00 c3 61 6c 75 66 51 c5 6b 61 61 65 df ff 6c 76 6b 00 52 7a c4 62 03 00 6c 76 6b 00 c3 61 6c 75 66 52 c5 6b 6c 76 6b 00 52 7a c4 61 6c 76 6b 00 c3 6c 76 6b 51 52 7a c4 62 03 00 6c 76 6b 51 c3 61 6c 75 66 51 c5 6b 61 01 20 6c 76 6b 00 52 7a c4 62 03 00 6c 76 6b 00 c3 61 6c 75 66";
         let csByteCode = csBC.val().trim();
         console.log(csByteCode);
         jsBC.val(jsByteCode);
@@ -142,10 +139,7 @@
         } else {
           jsBC.addClass('is-success');
         }
-        // if (csByteCode === '') {
-        //   return;
-        // }
-        //
+
         let diff = new Diff();
         let textDiff = diff.main(csByteCode, jsByteCode);
         $('#byteCodeDiff').html(diff.prettyHtml(textDiff));
@@ -178,7 +172,7 @@
               name: node.params[n].name,
               pos: n,
               isFunctionArgument: true,
-              wasUsed: false,
+              wasUsed: false, // todo: wasUsed may be deprecated
             };
             neo.methods[node.id.name].functionArguments.push(functionParamObject);
             neo.methods[node.id.name].functionVariables[node.params[n].name] = functionParamObject;
@@ -206,13 +200,7 @@
         this.InsertPushOne(functionStack, opCodes.TOALTSTACK);
 
         for (let n = 0; n < functionStack.totalFunctionArgs; n++) {
-          this.InsertPushOne(functionStack, opCodes.FROMALTSTACK);
-          this.InsertPushOne(functionStack, opCodes.DUP);
-          this.InsertPushOne(functionStack, opCodes.TOALTSTACK);
-          this.InsertPushNumber(functionStack, n);
-          this.InsertPushNumber(functionStack, 2);
-          this.InsertPushOne(functionStack, opCodes.ROLL);
-          this.InsertPushOne(functionStack, opCodes.SETITEM);
+          this.ConvertStLoc(functionStack, n);
         }
         //_insertBeginCode end
 
@@ -226,14 +214,20 @@
         //_insertEndCode end
 
         //ConvertAddrInMethod
+        console.log(functionStack.addressConvert);
         for (let n = 0; n < functionStack.stack.length; n++) {
           let stackItem = functionStack.stack[n];
           if (stackItem.fixAddress && stackItem.code !== opCodes.CALL) {
-            let sourceAddress = stackItem.sourceAddress + 1;// + 2;
+            let sourceAddress = stackItem.sourceAddress;// + 2;
             let addressOffset = functionStack.addressConvert[sourceAddress] - stackItem.address;
             stackItem.bytes = this.HexByteArrayNumBits([this.IntToHex(addressOffset)], 2);
             stackItem.fixAddress = false;
-            console.log('addr=%d, src=%d, offset=%d', functionStack.addressConvert[sourceAddress], sourceAddress, addressOffset);
+            console.log(stackItem);
+            console.log('ConvertAddrInMethod stackItem.sourceAddress=%s', stackItem.sourceAddress);
+            console.log('ConvertAddrInMethod stackItem.address=%s', stackItem.address);
+            console.log('ConvertAddrInMethod functionStack.addressConvert[sourceAddress]=%s', functionStack.addressConvert[sourceAddress]);
+            console.log('ConvertAddrInMethod addressOffset=%s', addressOffset);
+            console.log('ConvertAddrInMethod src=%d, addr=%d, offset=%d', sourceAddress, functionStack.addressConvert[sourceAddress], addressOffset);
           }
         }
         //ConvertAddrInMethod end
@@ -242,15 +236,11 @@
       BlockStatement: function (parentMethod, node) {
         console.log('BlockStatement() called (range: %s)', JSON.stringify(this.NodeRange(node)));
 
-        // this.StackPushCode(parentMethod, opCodes.NOP, true);
         this.ConvertPushOne(parentMethod, opCodes.NOP, parentMethod.sourceOperations++);
 
         for (let i = 0; i < node.body.length; i++) {
           let childNode = node.body[i];
           switch (childNode.type) {
-            // case "FunctionDeclaration":
-            //   this.FunctionDeclaration(childNode);
-            //   break;
             case "VariableDeclaration":
               this.VariableDeclaration(parentMethod, childNode.declarations);
               break;
@@ -262,7 +252,6 @@
               break;
             case "IfStatement":
               console.error('BlockStatement() IfStatement');
-              console.log(childNode);
               this.IfStatement(parentMethod, childNode);
               break;
             default:
@@ -271,57 +260,149 @@
           }
         }
       },
+      ParseExpression: function(parentMethod, expression, nestedCall = false, isLeftExpression = false, operatorType = false) {
+        if(!nestedCall) {
+          this.IncrementMethodVarCount(parentMethod);
+        }
+        switch (expression.type) {
+          case "LogicalExpression":
+            console.log('ParseExpression.LogicalExpression');
+            console.log(expression);
+            let operatorInt = 0;
+            switch(expression.operator) {
+              case "&&":
+                break;
+              case "||":
+                operatorInt = 1;
+                break;
+            }
+            this.ParseExpression(parentMethod, expression.left, true, true, expression.operator);
+            let code = this.ConvertPushOne(parentMethod, opCodes.JMPIF, parentMethod.sourceOperations, [this.IntToHex(0), this.IntToHex(0)]);
+            console.log('JMP target is: %s', parentMethod.sourceOperations);
+            this.ParseExpression(parentMethod, expression.right, true);
+            code.fixAddress = true;
+            code.sourceAddress = parentMethod.sourceOperations + 2;
+
+            code = this.ConvertPushOne(parentMethod, opCodes.JMP, parentMethod.sourceOperations++, [this.IntToHex(0), this.IntToHex(0)]);
+            console.log('JMP target is: %s', parentMethod.sourceOperations);
+            code.fixAddress = true;
+            code.sourceAddress = parentMethod.sourceOperations + 1;
+            this.ConvertPushNumber(parentMethod, operatorInt, parentMethod.sourceOperations++);
+            break;
+          case "Literal":
+            this.ConvertPushOne(parentMethod, opCodes.NOP, parentMethod.sourceOperations++);
+            this.ConvertPushOne(parentMethod, opCodes.NOP, parentMethod.sourceOperations++);
+            break;
+          case "BinaryExpression":
+            this.ConvertLdLoc(parentMethod, parentMethod.functionVariables[expression.left.name].pos);
+            this.ConvertLdLoc(parentMethod, parentMethod.functionVariables[expression.right.name].pos);
+            let operatorOpCode = expression.operator === '>' ? opCodes.GT : opCodes.LT;
+            switch (expression.operator) {
+              case ">":
+                operatorOpCode = opCodes.GT;
+                if(operatorType === '&&') {
+                  operatorOpCode = opCodes.LTE;
+                }
+                this.ConvertPushOne(parentMethod, operatorOpCode, parentMethod.sourceOperations++);
+                break;
+              case ">=":
+                operatorOpCode = opCodes.LT;
+
+                if(operatorType === '||') {
+                  operatorOpCode = opCodes.GTE;
+                }
+                console.log('isLeftExpression: %s', isLeftExpression);
+                console.log('operatorOpCode: %s', operatorOpCode);
+                console.log('operatorType: %s', operatorType);
+                this.ConvertPushOne(parentMethod, operatorOpCode, parentMethod.sourceOperations++);
+                if(operatorType !== '||' && operatorType !== '&&') {
+                  this.ConvertPushNumber(parentMethod, 0, parentMethod.sourceOperations++);
+                  this.ConvertPushOne(parentMethod, opCodes.NUMEQUAL, parentMethod.sourceOperations++);
+                }
+                break;
+              case "<":
+                console.log('isLeftExpression: %s', isLeftExpression);
+                console.log('operatorOpCode: %s', operatorOpCode);
+                console.log('operatorType: %s', operatorType);
+                operatorOpCode = opCodes.LT;
+                if(operatorType === '&&') {
+                  operatorOpCode = opCodes.GTE;
+                }
+                this.ConvertPushOne(parentMethod, operatorOpCode, parentMethod.sourceOperations++);
+                break;
+              case "<=":
+                operatorOpCode = opCodes.GT;
+
+                if(operatorType === '||') {
+                  operatorOpCode = opCodes.LTE;
+                }
+                console.log('isLeftExpression: %s', isLeftExpression);
+                console.log('operatorOpCode: %s', operatorOpCode);
+                console.log('operatorType: %s', operatorType);
+                this.ConvertPushOne(parentMethod, operatorOpCode, parentMethod.sourceOperations++);
+                if(operatorType !== '||' && operatorType !== '&&') {
+                  this.ConvertPushNumber(parentMethod, 0, parentMethod.sourceOperations++);
+                  this.ConvertPushOne(parentMethod, opCodes.NUMEQUAL, parentMethod.sourceOperations++);
+                }
+                break;
+            }
+            break;
+        }
+      },
 
       IfStatement: function (parentMethod, expression) {
         console.error("IfStatement()");
+        console.log(expression);
 
-        // alternate: false action
-        // consequent: true action
-        // test: condition
         let testResult = this.TestConditionalStatement(parentMethod, expression.test);
-
+        this.ParseExpression(parentMethod, expression.test);
         console.log('test result was %s', testResult);
-        if (expression.consequent.body.length === 0) {
-          if(testResult) {
-            this.ConvertPushOne(parentMethod, opCodes.NOP, parentMethod.sourceOperations++);
-          }
-          if(expression.test.type === 'Literal' && testResult) {
-            this.ConvertPushOne(parentMethod, opCodes.NOP, parentMethod.sourceOperations++);
-          } else {
-            let code = this.ConvertPushOne(parentMethod, opCodes.JMP, parentMethod.sourceOperations++, [this.IntToHex(0), this.IntToHex(0)]);
-            code.fixAddress = true;
-            code.sourceAddress = parentMethod.sourceOperations - 1;
-          }
+        if (expression.consequent !== null) {
+          console.error('IfStatement(): %s expression.consequent !== null', expression.test.type);
+          let conditionalLocation = (parentMethod.varCount + parentMethod.totalFunctionArgs) - 1;
+          console.log('conditionalLocation parentMethod.varCount %s', parentMethod.varCount);
+          console.log('conditionalLocation parentMethod.totalVars %s', parentMethod.totalVars);
+          console.log('conditionalLocation parentMethod.totalFunctionArgs %s', parentMethod.totalFunctionArgs);
+          console.error('pushing %s', conditionalLocation);
+          this.ConvertStLoc(parentMethod, conditionalLocation);
+          this.ConvertLdLoc(parentMethod, conditionalLocation);
+
+          // brfalse - JMP to this address on false (else)
+          let code = this.ConvertPushOne(parentMethod, opCodes.JMPIFNOT, parentMethod.sourceOperations++, [this.IntToHex(0), this.IntToHex(0)]);
+          console.log('JMP: sourceOperations is %s', parentMethod.sourceOperations);
+
+          this.BlockStatement(parentMethod, expression.consequent);
+          this.ConvertPushOne(parentMethod, opCodes.NOP, parentMethod.sourceOperations++);
+
+          console.log('JMP target is: %s', parentMethod.sourceOperations);
+          code.fixAddress = true;
+          let addressIncrement = expression.alternate !== null ? 2 : 0;
+          code.sourceAddress = parentMethod.sourceOperations + addressIncrement;
+
         }
 
-        if (expression.alternate === null && !testResult) {
-          // alternate else is not defined at all, add a nop
-          //   this.ConvertPushOne(parentMethod, opCodes.NOP, parentMethod.sourceOperations++);
-        } else if (expression.alternate !== null && expression.alternate.body.length === 0) {
-          // else is defined but is empty
-          if(!testResult) {
-            this.ConvertPushOne(parentMethod, opCodes.NOP, parentMethod.sourceOperations++);
-          }
-          if(expression.test.type === 'Literal' && !testResult) {
-            this.ConvertPushOne(parentMethod, opCodes.NOP, parentMethod.sourceOperations++);
-          } else {
-            let code = this.ConvertPushOne(parentMethod, opCodes.JMP, parentMethod.sourceOperations++, [this.IntToHex(0), this.IntToHex(0)]);
-            code.fixAddress = true;
-            code.sourceAddress = parentMethod.sourceOperations - 1;
-          }
+        if (expression.alternate !== null) {
+          let code = this.ConvertPushOne(parentMethod, opCodes.JMP, parentMethod.sourceOperations++, [this.IntToHex(0), this.IntToHex(0)]);
+          console.log('JMP: sourceOperations is %s', parentMethod.sourceOperations);
+
+          this.BlockStatement(parentMethod, expression.alternate);
+          this.ConvertPushOne(parentMethod, opCodes.NOP, parentMethod.sourceOperations++);
+
+          console.log('JMP target is: %s', parentMethod.sourceOperations);
+          code.fixAddress = true;
+          code.sourceAddress = parentMethod.sourceOperations;
+
         }
+        console.error('leaving IfStatement');
       },
 
       TestConditionalStatement: function (parentMethod, conditional) {
         console.error("TestConditionalStatement()");
         console.log(conditional);
         let testHasLeft, testHasRight, leftTest, rightTest;
-        let testResult = false;
 
         testHasLeft = typeof(conditional.left) !== 'undefined';
         testHasRight = typeof(conditional.right) !== 'undefined';
-        console.log(conditional.left);
-        console.log(conditional.right);
         let testCondition = false;
 
         if (typeof(conditional.type) !== 'undefined') {
@@ -331,6 +412,7 @@
               rightTest = this.TestConditionalStatement(parentMethod, conditional.right);
               switch (conditional.operator) {
                 case "&&":
+                  console.log('TestConditionalStatement() leftTest: %s, rightTest: %s', leftTest, rightTest);
                   testCondition = leftTest && rightTest;
                   break;
                 case "||":
@@ -342,6 +424,27 @@
               console.error("LogicalExpression()");
               console.log(conditional);
               break;
+            case "BinaryExpression":
+              let left = parentMethod.functionVariables[conditional.left.name];
+              let right = parentMethod.functionVariables[conditional.right.name];
+              switch (conditional.operator) {
+                case ">":
+                  testCondition = left.value > right.value;
+                  break;
+                case "<":
+                  testCondition = left.value < right.value;
+                  break;
+                case ">=":
+                  testCondition = left.value >= right.value;
+                  break;
+                case "<=":
+                  testCondition = left.value <= right.value;
+                  break;
+              }
+              console.log('left: %o', left);
+              console.log('right: %o', right);
+              console.log('comparison: %s %s %s = %s', left.value, conditional.operator, right.value, testCondition);
+              break;
             case "UnaryExpression":
               console.error("UnaryExpression()");
               console.log(conditional);
@@ -352,27 +455,21 @@
               break;
             case "Literal":
               console.log("Literal - adding var count");
-              testResult = conditional.value;
+              testCondition = conditional.value;
               this.ConvertPushOne(parentMethod, conditional.value ? opCodes.PUSH1 : opCodes.PUSH0, parentMethod.sourceOperations++);
               console.log('var count is %d', parentMethod.varCount);// parentMethod.varCount++;
-              this.ConvertPushOne(parentMethod, opCodes.FROMALTSTACK, parentMethod.sourceOperations++);
-              this.ConvertPushOne(parentMethod, opCodes.DUP);
-              this.ConvertPushOne(parentMethod, opCodes.TOALTSTACK);
-              console.log(parentMethod);
-              this.ConvertPushNumber(parentMethod, parentMethod.varCount++ + parentMethod.totalFunctionArgs);
-              this.ConvertPushNumber(parentMethod, 2);
-              this.ConvertPushOne(parentMethod, opCodes.ROLL);
-              this.ConvertPushOne(parentMethod, opCodes.SETITEM);
-
+              this.ConvertStLoc(parentMethod, parentMethod.varCount++ + parentMethod.totalFunctionArgs);
               break;
+            default:
+              console.error('TestConditionalStatement() unhandled conditional.type: %s', conditional.type);
           }
         } else {
           // not a condition with a type, must be literal
-
           console.error('unhandled conditional type: %s', conditional.type);
           console.log(conditional);
         }
-        return testResult;
+        console.log('test condition was: %s', testCondition);
+        return testCondition;
       },
 
       ReturnStatement: function (parentMethod, expression) {
@@ -383,18 +480,11 @@
           this.VariableAssignment(parentMethod, expression);
         }
 
-        let targetAddress = [this.IntToHex(0), this.IntToHex(0)];
-        let code = this.ConvertPushOne(parentMethod, opCodes.JMP, parentMethod.sourceOperations++, targetAddress);
+        let code = this.ConvertPushOne(parentMethod, opCodes.JMP, parentMethod.sourceOperations++, [this.IntToHex(0), this.IntToHex(0)]);
         code.fixAddress = true;
-        code.sourceAddress = parentMethod.sourceOperations - 1;
+        code.sourceAddress = parentMethod.sourceOperations;
 
-        this.ConvertPushOne(parentMethod, opCodes.FROMALTSTACK, parentMethod.sourceOperations++);
-        this.ConvertPushOne(parentMethod, opCodes.DUP);
-        this.ConvertPushOne(parentMethod, opCodes.TOALTSTACK);
-        this.ConvertPushNumber(parentMethod, (parentMethod.totalFunctionArgs + parentMethod.totalVars) - 1);
-        this.ConvertPushOne(parentMethod, opCodes.PICKITEM);
-
-
+        this.ConvertLdLoc(parentMethod, (parentMethod.totalFunctionArgs + parentMethod.totalVars) - 1);
       },
 
       IncrementMethodTotalVars: function (parentMethod) {
@@ -431,11 +521,7 @@
               // an array or object
               let assignmentVarName = expression.left.object.name;
               parentMethod.functionVariables[assignmentVarName].value[expression.left.property.raw] = expression.right.value;
-              this.ConvertPushOne(parentMethod, opCodes.FROMALTSTACK, parentMethod.sourceOperations++);
-              this.ConvertPushOne(parentMethod, opCodes.DUP);
-              this.ConvertPushOne(parentMethod, opCodes.TOALTSTACK);
-              this.ConvertPushNumber(parentMethod, parentMethod.functionVariables[assignmentVarName].pos + parentMethod.totalFunctionArgs);
-              this.ConvertPushOne(parentMethod, opCodes.PICKITEM);
+              this.ConvertLdLoc(parentMethod, parentMethod.functionVariables[assignmentVarName].pos + parentMethod.totalFunctionArgs);
               this.ConvertPushNumber(parentMethod, parseInt(expression.left.property.raw));
             }
 
@@ -485,13 +571,7 @@
               switch (expr.type) {
                 case "Identifier":
                   neo.methods[callExpression.callee.name].functionArguments[i].value = parentMethod.functionVariables[expr.name].value;
-                  // neo.methods[callExpression.callee.name].functionArguments.push(parentMethod.functionVariables[expr.name]);
-                  this.ConvertPushOne(parentMethod, opCodes.FROMALTSTACK, parentMethod.sourceOperations++);
-                  this.ConvertPushOne(parentMethod, opCodes.DUP);
-                  this.ConvertPushOne(parentMethod, opCodes.TOALTSTACK);
-                  // this.ConvertPushNumber(parentMethod, identifiersAdded++ + parentMethod.totalFunctionArgs);
-                  this.ConvertPushNumber(parentMethod, parentMethod.functionVariables[expr.name].pos + parentMethod.totalFunctionArgs);
-                  this.ConvertPushOne(parentMethod, opCodes.PICKITEM);
+                  this.ConvertLdLoc(parentMethod, parentMethod.functionVariables[expr.name].pos + parentMethod.totalFunctionArgs);
                   break;
                 case "Literal":
                   neo.methods[callExpression.callee.name].functionArguments[i].value = expr.value;
@@ -655,17 +735,13 @@
             let sourceVariable = parentMethod.functionVariables[variable.name];
             sourceVariable.wasUsed = true;
             returnValue = sourceVariable.value;
-            this.ConvertPushOne(parentMethod, opCodes.FROMALTSTACK, parentMethod.sourceOperations++);
-            this.ConvertPushOne(parentMethod, opCodes.DUP);
-            this.ConvertPushOne(parentMethod, opCodes.TOALTSTACK);
             if (sourceVariable.isFunctionArgument) {
               // opcodes.ldArg
-              this.ConvertPushNumber(parentMethod, sourceVariable.pos);
+              this.ConvertLdLoc(parentMethod, sourceVariable.pos);
             } else {
               // opcodes.ldloc
-              this.ConvertPushNumber(parentMethod, sourceVariable.pos + parentMethod.totalFunctionArgs);
+              this.ConvertLdLoc(parentMethod, sourceVariable.pos + parentMethod.totalFunctionArgs);
             }
-            this.ConvertPushOne(parentMethod, opCodes.PICKITEM);
             break;
           case "BinaryExpression":
             console.log(variable);
@@ -678,16 +754,7 @@
         }
 
         console.log('VariableAssignment() VariableDeclarator');
-        this.ConvertPushOne(parentMethod, opCodes.FROMALTSTACK, parentMethod.sourceOperations++);
-        this.ConvertPushOne(parentMethod, opCodes.DUP);
-        this.ConvertPushOne(parentMethod, opCodes.TOALTSTACK);
-        let variableIndex = parentMethod.varCount + parentMethod.totalFunctionArgs;
-        console.log('variable index %d', variableIndex);
-        this.ConvertPushNumber(parentMethod, variableIndex);
-        this.ConvertPushNumber(parentMethod, 2);
-        this.ConvertPushOne(parentMethod, opCodes.ROLL);
-        this.ConvertPushOne(parentMethod, opCodes.SETITEM);
-
+        this.ConvertStLoc(parentMethod, parentMethod.varCount + parentMethod.totalFunctionArgs);
         this.IncrementMethodVarCount(parentMethod);
 
         return returnValue;
@@ -697,8 +764,25 @@
         console.error(variable);
       },
 
+      ConvertStLoc: function (parentMethod, pos) {
+        this.ConvertPushOne(parentMethod, opCodes.FROMALTSTACK, parentMethod.sourceOperations++);
+        this.ConvertPushOne(parentMethod, opCodes.DUP);
+        this.ConvertPushOne(parentMethod, opCodes.TOALTSTACK);
+        this.ConvertPushNumber(parentMethod, pos);
+        this.ConvertPushNumber(parentMethod, 2);
+        this.ConvertPushOne(parentMethod, opCodes.ROLL);
+        this.ConvertPushOne(parentMethod, opCodes.SETITEM);
+      },
+      ConvertLdLoc: function (parentMethod, pos) {
+        this.ConvertPushOne(parentMethod, opCodes.FROMALTSTACK, parentMethod.sourceOperations++);
+        this.ConvertPushOne(parentMethod, opCodes.DUP);
+        this.ConvertPushOne(parentMethod, opCodes.TOALTSTACK);
+        this.ConvertPushNumber(parentMethod, pos);
+        this.ConvertPushOne(parentMethod, opCodes.PICKITEM);
+      },
       ConvertPushOne: function (parentMethod, mCode, mSourceOperations = null, mExtraData = null) {
-        console.error('ConvertPushOne() %s', mCode);
+        let opCodeData = this.opCodeDesc(mCode);
+        console.error('ConvertPushOne() %s=%s: addr=%s', opCodeData.code, opCodeData.desc, mSourceOperations);
         let startAddress = parentMethod.address;
 
         let code = {
@@ -711,7 +795,8 @@
         };
 
         if (mSourceOperations !== null) {
-          if (mCode === opCodes.JMP) {
+          if (mCode === opCodes.JMP || mCode === opCodes.JMPIFNOT || mCode === opCodes.JMPIF) {
+            console.log('ConvertPushOne() JMP/JMPIFNOT/JMPIF - sourceoperations++');
             parentMethod.sourceOperations++;
           }
           parentMethod.addressConvert[mSourceOperations] = startAddress;
@@ -880,6 +965,19 @@
           val = '00' + val;
         }
         return val;
+      },
+
+      opCodeDesc: function (opcode) {
+        if (typeof(this.opCodeDescs) == 'undefined') {
+          this.opCodeDescs = {};
+          for (let n in opCodes) {
+            this.opCodeDescs[opCodes[n]] = n;
+          }
+        }
+        if (opcode.indexOf('0x') === -1) {
+          opcode = '0x' + opcode;
+        }
+        return {code: opcode, desc: this.opCodeDescs[opcode]};
       }
 
     }

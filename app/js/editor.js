@@ -9,7 +9,7 @@ let editors = {};
 let minimumLines = 70;
 let autoSaveTimer;
 let newButton, openButton, saveButton, fileEntry, hasWriteAccess;
-
+let selectionRange = {};
 
 const {remote, clipboard} = require('electron');
 const {Menu, MenuItem, dialog} = remote;
@@ -54,7 +54,9 @@ $(function () {
   console.log(editorTabData);
 
   for (let n in editorTabData) {
-    if(n === 'opts') { continue; }
+    if (n === 'opts') {
+      continue;
+    }
     createEditorTab(n);
   }
 
@@ -74,10 +76,12 @@ function setEditorTabActive(tabID) {
   $('#{0}'.format(tabID)).addClass('is-active');
   $('.editor-tab-content').addClass('hidden');
   $('#editor-{0}'.format(tabID)).removeClass('hidden');
-  if(typeof(editorTabData[editorTabData.opts.currentActiveTab]) === 'undefined') {
+  if (typeof(editorTabData[editorTabData.opts.currentActiveTab]) === 'undefined') {
     // last active tab has been removed, default to first tab in list
-    for(let n in editorTabData) {
-      if(n === 'opts') { continue; }
+    for (let n in editorTabData) {
+      if (n === 'opts') {
+        continue;
+      }
       editorTabData.opts.currentActiveTab = n;
       break;
     }
@@ -104,6 +108,7 @@ function createEditorTab(tabID = false) {
       onChangeTimer: false,
       csByteCode: "",
       value: "",
+      selectionRange: {start: 0, end: 0}
     };
   }
   let $newTab = $('#tab-template').find('li').clone();
@@ -166,15 +171,46 @@ function createEditorTab(tabID = false) {
 
     storeEditorChanges(tabID);
   });
+
+  editors[tabID].on('cursorActivity', function (editor) {
+    let needleStr = RegExp.escape(editor.getSelection().replaceAll("\n", " "));
+    let needle = new RegExp(needleStr, "g");
+    let haystack = editors[tabID].doc.getValue().replaceAll("\n", " ");
+
+    let result = needle.exec(haystack);
+
+    let selectedRange = {start: result.index, end: result.index + needleStr.length};
+    editorTabData[tabID].selectionRange = selectedRange;
+    $('.bc-data').each(function () {
+      let spanRange = {start: $(this).data('start'), end: $(this).data('end')};
+      if(spanRange.start >= selectedRange.start && spanRange.start <= selectedRange.end &&
+      spanRange.end >= selectedRange.start && spanRange.end <= selectedRange.end
+      ) {
+        $(this).addClass('hilite');
+      } else {
+        $(this).removeClass('hilite');
+
+      }
+    });
+  });
   editors[tabID].setSize('100%', '100%');
   setEditorTabActive(tabID);
 }
 
-function removeEditorTab() {
-  let $activeTab =$('.is-active');
+RegExp.escape = function (s) {
+  return s.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+};
 
-  modalConfirm('Confirm close', 'Are you sure you wish to close this tab?', function(response) {
-    if(response) {
+String.prototype.replaceAll = function (search, replacement) {
+  var target = this;
+  return target.replace(new RegExp(search, 'g'), replacement);
+};
+
+function removeEditorTab() {
+  let $activeTab = $('.is-active');
+
+  modalConfirm('Confirm close', 'Are you sure you wish to close this tab?', function (response) {
+    if (response) {
       delete editorTabData[$activeTab.attr('id')];
       $activeTab.remove();
       setEditorTabActive(editorTabData.opts.lastActiveTab);
@@ -202,14 +238,14 @@ function modalConfirm(title, message, callback = false) {
   $confirm.css({display: 'inline'});
   $confirm.find('.modal-card-title').html(title);
   $confirm.find('.modal-card-body').html(message);
-    $confirm.find('.delete, .is-danger, .is-success').on('click', function() {
-      $confirm.css({display: 'none'});
-      $confirm.remove();
-      if(callback) {
-        callback($(this).data('response') == "1" ? true : false);
-      }
-    });
-    $('BODY').append($confirm);
+  $confirm.find('.delete, .is-danger, .is-success').on('click', function () {
+    $confirm.css({display: 'none'});
+    $confirm.remove();
+    if (callback) {
+      callback($(this).data('response') == "1" ? true : false);
+    }
+  });
+  $('BODY').append($confirm);
 
 }
 

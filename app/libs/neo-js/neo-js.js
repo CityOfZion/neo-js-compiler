@@ -52,6 +52,7 @@
         console.log(this);
         neo.methods = {};
         neo.stack = {};
+        neo.activeRange = {};
 
         neo.sourceNodes = acorn.parse(jsSource, {
           sourceType: "module",
@@ -101,7 +102,7 @@
             if (typeof(fnStack[n].bytes) !== 'undefined') {
               // add any additional bytes associated with this instruction
               for (let m = 0; m < fnStack[n].bytes.length; m++) {
-                cleanStack.stack.push({code: fnStack[n].bytes[m]});
+                cleanStack.stack.push({code: fnStack[n].bytes[m], range: fnStack[n].range});
               }
             }
           }
@@ -114,24 +115,36 @@
         }
 
         let byteCodeOutput = [];
+        let byteCodeRanges = [];
         for (let n = 0; n < byteCode.length; n++) {
           if (byteCode[n].fixAddress === true) {
             // opCodes.CALL requires address rewrite after stack is determined
             let targetAddress = neo.methods[byteCode[n].targetAddress.methodName].byteCodeAddress;
             console.error('%s target address is %s / n is %d / %d (%s)', byteCode[n].targetAddress.methodName, targetAddress, n, targetAddress - n, this.IntToHex(targetAddress - n));
             let newAddress = this.HexByteArrayNumBits([this.IntToHex(targetAddress - n, false)], 2);
-            byteCode[n + 1].code = '0x' + newAddress[0];
-            byteCode[n + 2].code = '0x' + newAddress[1];
+            byteCode[n + 1] = {code: '0x' + newAddress[0], range: byteCode[n].range};
+            byteCode[n + 2] = {code: '0x' + newAddress[1], range: byteCode[n].range};
           }
           byteCodeOutput.push(byteCode[n].code);
+          console.log(byteCode[n]);
+          // if(typeof(byteCode[n].range) !== 'undefined') {
+            byteCodeRanges.push('<span class="bc-data" data-start={0} data-end={1} title="{2}">{3}</span>'.format(
+              byteCode[n].range.start,
+              byteCode[n].range.end,
+              (this.opCodeDesc(byteCode[n].code)).desc,
+              byteCode[n].code
+              )
+            );
+          // }
         }
+        console.log(byteCodeOutput);
 
-        let jsByteCode = byteCodeOutput.join(" ").toLowerCase().replace(new RegExp('0x', 'g'), '');
+        let jsByteCode = byteCodeOutput.join(" ").toLowerCase().replaceAll('0x', '');
         let jsBC = $('#jsByteCode');
         let csBC = $('#csByteCode');
         let csByteCode = csBC.val().trim();
         console.log(csByteCode);
-        jsBC.val(jsByteCode);
+        jsBC.html(byteCodeRanges.join(" ").toLowerCase().replaceAll('0x', ''));
         jsBC.removeClass('is-danger');
         jsBC.removeClass('is-success');
         if (jsByteCode !== csByteCode) {
@@ -147,6 +160,7 @@
 
       FunctionDeclaration: function (node, justInitFunctionDeclarations) {
         console.log('FunctionDeclaration(%s) called: %s (range: %s)', justInitFunctionDeclarations, node.id.name, JSON.stringify(this.NodeRange(node)));
+        this.SetActiveRange(node);
         let totalVarCount = 0;
         if (justInitFunctionDeclarations) {
           // only initialise the function list, this happens so that we can determine
@@ -219,10 +233,13 @@
           let stackItem = functionStack.stack[n];
           if (stackItem.fixAddress && stackItem.code !== opCodes.CALL) {
             let sourceAddress = stackItem.sourceAddress;// + 2;
-            let addressOffset = functionStack.addressConvert[sourceAddress] - stackItem.address;
-            stackItem.bytes = this.HexByteArrayNumBits([this.IntToHex(addressOffset)], 2);
+            // let addressOffset = functionStack.addressConvert[sourceAddress] - stackItem.address;
+            let addressOffset = functionStack.address - stackItem.address;
+            stackItem.bytes = this.HexByteArrayNumBits([this.IntToHex(addressOffset, false)], 2);
             stackItem.fixAddress = false;
+            console.log(functionStack);
             console.log(stackItem);
+            console.log('ConvertAddrInMethod method.address=%s', functionStack.address);
             console.log('ConvertAddrInMethod stackItem.sourceAddress=%s', stackItem.sourceAddress);
             console.log('ConvertAddrInMethod stackItem.address=%s', stackItem.address);
             console.log('ConvertAddrInMethod functionStack.addressConvert[sourceAddress]=%s', functionStack.addressConvert[sourceAddress]);
@@ -232,14 +249,19 @@
         }
         //ConvertAddrInMethod end
       },
-
+      SetActiveRange: function (node) {
+        this.activeRange = this.NodeRange(node);
+        console.log("active range set to %o", this.activeRange);
+      },
       BlockStatement: function (parentMethod, node) {
+        this.SetActiveRange(node);
         console.log('BlockStatement() called (range: %s)', JSON.stringify(this.NodeRange(node)));
-
+        console.log(node);
         this.ConvertPushOne(parentMethod, opCodes.NOP, parentMethod.sourceOperations++);
 
         for (let i = 0; i < node.body.length; i++) {
           let childNode = node.body[i];
+          this.SetActiveRange(childNode);
           switch (childNode.type) {
             case "VariableDeclaration":
               this.VariableDeclaration(parentMethod, childNode.declarations);
@@ -260,47 +282,63 @@
           }
         }
       },
-      ParseExpression: function(parentMethod, expression, nestedCall = false, isLeftExpression = false, operatorType = false) {
-        if(!nestedCall) {
+      ParseExpression: function (parentMethod, expression, expressionType = false, nestedCall = 0, operatorType = false) {
+        if (nestedCall <= 0) {
           this.IncrementMethodVarCount(parentMethod);
         }
+        console.log('expression %o', expression);
         switch (expression.type) {
           case "LogicalExpression":
-            console.log('ParseExpression.LogicalExpression');
-            console.log(expression);
+            console.log('ParseExpression.LogicalExpression: nestedCall: %d', nestedCall);
+            this.SetActiveRange(expression);
+
             let operatorInt = 0;
-            switch(expression.operator) {
+            switch (expression.operator) {
               case "&&":
                 break;
               case "||":
                 operatorInt = 1;
                 break;
             }
-            this.ParseExpression(parentMethod, expression.left, true, true, expression.operator);
+            let nestedCallIncrement = nestedCall + 1;
+            // Blt
+            // Bgt
+            this.ParseExpression(parentMethod, expression.left, expression.type, nestedCallIncrement, expression.operator);
             let code = this.ConvertPushOne(parentMethod, opCodes.JMPIF, parentMethod.sourceOperations, [this.IntToHex(0), this.IntToHex(0)]);
             console.log('JMP target is: %s', parentMethod.sourceOperations);
-            this.ParseExpression(parentMethod, expression.right, true);
-            code.fixAddress = true;
-            code.sourceAddress = parentMethod.sourceOperations + 2;
 
-            code = this.ConvertPushOne(parentMethod, opCodes.JMP, parentMethod.sourceOperations++, [this.IntToHex(0), this.IntToHex(0)]);
-            console.log('JMP target is: %s', parentMethod.sourceOperations);
+            this.ParseExpression(parentMethod, expression.right, expression.type, nestedCallIncrement);
+
             code.fixAddress = true;
-            code.sourceAddress = parentMethod.sourceOperations + 1;
-            this.ConvertPushNumber(parentMethod, operatorInt, parentMethod.sourceOperations++);
+            console.log(parentMethod);
+            let multipleConditionalOffset = nestedCall === 1 ? 6 : 0;
+            console.log('multipleConditionalOffset: offset: %d / %s', nestedCallIncrement, parentMethod.totalVars);
+            code.sourceAddress = parentMethod.sourceOperations + 2 + multipleConditionalOffset;
+
+            if (nestedCallIncrement <= 1) {
+              code = this.ConvertPushOne(parentMethod, opCodes.JMP, parentMethod.sourceOperations++, [this.IntToHex(0), this.IntToHex(0)]);
+              console.log('JMP target is: %s', parentMethod.sourceOperations);
+              code.fixAddress = true;
+              code.sourceAddress = parentMethod.sourceOperations + 1;
+              this.ConvertPushNumber(parentMethod, operatorInt, parentMethod.sourceOperations++);
+            }
             break;
           case "Literal":
             this.ConvertPushOne(parentMethod, opCodes.NOP, parentMethod.sourceOperations++);
             this.ConvertPushOne(parentMethod, opCodes.NOP, parentMethod.sourceOperations++);
             break;
           case "BinaryExpression":
+            this.SetActiveRange(expression);
+            console.log('BinaryExpression() nestedCall: %s', nestedCall);
+            console.log('BinaryExpression() expressionType: %s', expressionType);
+            console.log('BinaryExpression() expressionType: %o', expression);
             this.ConvertLdLoc(parentMethod, parentMethod.functionVariables[expression.left.name].pos);
             this.ConvertLdLoc(parentMethod, parentMethod.functionVariables[expression.right.name].pos);
             let operatorOpCode = expression.operator === '>' ? opCodes.GT : opCodes.LT;
             switch (expression.operator) {
               case ">":
                 operatorOpCode = opCodes.GT;
-                if(operatorType === '&&') {
+                if (operatorType === '&&') {
                   operatorOpCode = opCodes.LTE;
                 }
                 this.ConvertPushOne(parentMethod, operatorOpCode, parentMethod.sourceOperations++);
@@ -308,24 +346,22 @@
               case ">=":
                 operatorOpCode = opCodes.LT;
 
-                if(operatorType === '||') {
+                if (operatorType === '||') {
                   operatorOpCode = opCodes.GTE;
                 }
-                console.log('isLeftExpression: %s', isLeftExpression);
                 console.log('operatorOpCode: %s', operatorOpCode);
                 console.log('operatorType: %s', operatorType);
                 this.ConvertPushOne(parentMethod, operatorOpCode, parentMethod.sourceOperations++);
-                if(operatorType !== '||' && operatorType !== '&&') {
+                if (operatorType !== '||' && operatorType !== '&&' && nestedCall <= 1) {
                   this.ConvertPushNumber(parentMethod, 0, parentMethod.sourceOperations++);
                   this.ConvertPushOne(parentMethod, opCodes.NUMEQUAL, parentMethod.sourceOperations++);
                 }
                 break;
               case "<":
-                console.log('isLeftExpression: %s', isLeftExpression);
                 console.log('operatorOpCode: %s', operatorOpCode);
                 console.log('operatorType: %s', operatorType);
                 operatorOpCode = opCodes.LT;
-                if(operatorType === '&&') {
+                if (operatorType === '&&') {
                   operatorOpCode = opCodes.GTE;
                 }
                 this.ConvertPushOne(parentMethod, operatorOpCode, parentMethod.sourceOperations++);
@@ -333,14 +369,13 @@
               case "<=":
                 operatorOpCode = opCodes.GT;
 
-                if(operatorType === '||') {
+                if (operatorType === '||') {
                   operatorOpCode = opCodes.LTE;
                 }
-                console.log('isLeftExpression: %s', isLeftExpression);
                 console.log('operatorOpCode: %s', operatorOpCode);
                 console.log('operatorType: %s', operatorType);
                 this.ConvertPushOne(parentMethod, operatorOpCode, parentMethod.sourceOperations++);
-                if(operatorType !== '||' && operatorType !== '&&') {
+                if (operatorType !== '||' && operatorType !== '&&' && nestedCall <= 1) {
                   this.ConvertPushNumber(parentMethod, 0, parentMethod.sourceOperations++);
                   this.ConvertPushOne(parentMethod, opCodes.NUMEQUAL, parentMethod.sourceOperations++);
                 }
@@ -399,10 +434,9 @@
       TestConditionalStatement: function (parentMethod, conditional) {
         console.error("TestConditionalStatement()");
         console.log(conditional);
-        let testHasLeft, testHasRight, leftTest, rightTest;
-
-        testHasLeft = typeof(conditional.left) !== 'undefined';
-        testHasRight = typeof(conditional.right) !== 'undefined';
+        let leftTest, rightTest;
+        // testHasLeft = typeof(conditional.left) !== 'undefined';
+        // testHasRight = typeof(conditional.right) !== 'undefined';
         let testCondition = false;
 
         if (typeof(conditional.type) !== 'undefined') {
@@ -646,7 +680,9 @@
 
       VariableDeclaration: function (parentMethod, declarations) {
         console.error('VariableDeclaration() called with %d declarations', declarations.length);
+        console.log(declarations);
         for (let i = 0; i < declarations.length; i++) {
+          this.SetActiveRange(declarations[i]);
           let varPosition = parentMethod.varCount;
           let returnValue = this.VariableAssignment(parentMethod, declarations[i].init, declarations[i].id.name);
           parentMethod.functionVariables[declarations[i].id.name] = {
@@ -697,7 +733,7 @@
               arrayLength = parentMethod.functionVariables[variableName].value.length;
             }
             console.log('array length is: %d', arrayLength);
-            this.ConvertPushNumber(parentMethod, arrayLength);
+            this.ConvertPushNumber(parentMethod, variable.elements.length);
             this.ConvertPushOne(parentMethod, opCodes.NEWARRAY, parentMethod.sourceOperations++);
             console.log(variable.elements);
             returnValue = [];
@@ -783,6 +819,7 @@
       ConvertPushOne: function (parentMethod, mCode, mSourceOperations = null, mExtraData = null) {
         let opCodeData = this.opCodeDesc(mCode);
         console.error('ConvertPushOne() %s=%s: addr=%s', opCodeData.code, opCodeData.desc, mSourceOperations);
+        // console.error('active range: %o', this.activeRange);
         let startAddress = parentMethod.address;
 
         let code = {
@@ -792,6 +829,7 @@
           fixAddress: false,
           sourceAddress: 0,
           targetAddress: null,
+          range: this.activeRange,
         };
 
         if (mSourceOperations !== null) {
@@ -848,7 +886,6 @@
       },
 
       InsertPushOne: function (parentMethod, mCode, mComment = null, mExtraData = null) {
-
         let code = {
           address: parentMethod.address,
           code: mCode,
@@ -856,6 +893,7 @@
           fixAddress: false,
           sourceAddress: 0,
           targetAddress: null,
+          range: this.activeRange,
         };
 
         if (mComment !== null) {
@@ -942,6 +980,14 @@
         if (typeof(mArray[0]) === 'object') {
           mArray = mArray[0];
         }
+
+        for(let i = 0; i < mArray.length; i++) {
+          if(mArray[i].length > 2) {
+            mArray[i+1] = mArray[i].substr(0, 2);
+            mArray[i] = mArray[i].substr(2, 4);
+          }
+        }
+
         for (let i = mArray.length; i < bits; i++) {
           mArray.push("00");
         }
@@ -968,7 +1014,7 @@
       },
 
       opCodeDesc: function (opcode) {
-        if (typeof(this.opCodeDescs) == 'undefined') {
+        if (typeof(this.opCodeDescs) === 'undefined') {
           this.opCodeDescs = {};
           for (let n in opCodes) {
             this.opCodeDescs[opCodes[n]] = n;

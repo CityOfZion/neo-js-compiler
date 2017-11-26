@@ -37,9 +37,6 @@ onload = function () {
 
   // newFile();
   onresize();
-
-  // let neojs = window.neoJSEngine;
-  // neojs.parser.parse(editor.doc.getValue());
 };
 
 $(function () {
@@ -51,7 +48,6 @@ $(function () {
   } else {
     editorTabData = JSON.parse(previousData);
   }
-  console.log(editorTabData);
 
   for (let n in editorTabData) {
     if (n === 'opts') {
@@ -99,7 +95,7 @@ function createEditorTab(tabID = false) {
   if (tabID) {
     // tab is being recreated
     tabSourceContent = editorTabData[tabID].value;
-    console.log('recreating tab: %s', tabID);
+    console.log('createEditorTab() recreating tab: %s', tabID);
     console.log(editorTabData);
   } else {
     // tab is new
@@ -112,7 +108,6 @@ function createEditorTab(tabID = false) {
     };
   }
   let $newTab = $('#tab-template').find('li').clone();
-  console.log($newTab);
   $newTab.attr('id', tabID);
 
   $newTab.find('.delete').on('click', function (e) {
@@ -122,7 +117,6 @@ function createEditorTab(tabID = false) {
   });
 
   $newTab.on('click', function () {
-    console.log('in click');
     setEditorTabActive(tabID);
   });
 
@@ -165,7 +159,7 @@ function createEditorTab(tabID = false) {
   // handle change events for this editor instance
   editors[tabID].on('change', function () {
     // editorTimer = setTimeout(function () {
-    window.neoJSEngine.parser.parse(editors[tabID].doc.getValue());
+    window.neo.parser.parse(editors[tabID].doc.getValue());
     // createNeoBytecode();
     // }, 1000);
 
@@ -181,17 +175,22 @@ function createEditorTab(tabID = false) {
 
     let selectedRange = {start: result.index, end: result.index + needleStr.length};
     editorTabData[tabID].selectionRange = selectedRange;
+    console.log(selectedRange);
+    let opcodeOutput = '';
+    $('.hilite').removeClass('hilite');
+
     $('.bc-data').each(function () {
       let spanRange = {start: $(this).data('start'), end: $(this).data('end')};
-      if(spanRange.start >= selectedRange.start && spanRange.start <= selectedRange.end &&
-      spanRange.end >= selectedRange.start && spanRange.end <= selectedRange.end
+      if (spanRange.start >= selectedRange.start && spanRange.start <= selectedRange.end &&
+        spanRange.end >= selectedRange.start && spanRange.end <= selectedRange.end
       ) {
         $(this).addClass('hilite');
-      } else {
-        $(this).removeClass('hilite');
-
+        let opCode = $(this).html().toUpperCase();
+        console.log(window.neo.OpCodes.name(opCode));
+        opcodeOutput += opCode + ': ' + window.neo.OpCodes.name(opCode).desc + '<br />';
       }
     });
+    $('#opcode-data').html(opcodeOutput);
   });
   editors[tabID].setSize('100%', '100%');
   setEditorTabActive(tabID);
@@ -287,22 +286,20 @@ onresize = function () {
   let activeTabID = $('.is-active').attr('id');
   // let $container = $('#editor-{0}'.format(activeTabID));
   let $container = $('#tab-content');
-  console.log($container);
   if ($container.length < 1) {
     console.log('nothing to resize');
     return;
   }
 
   let scrollerElement = editors[activeTabID].getScrollerElement();
-  console.log($container[0].offsetWidth);
-  console.log($container[0].offsetHeight);
+  console.log('container width/height: %dx%d', $container[0].offsetWidth, $container[0].offsetHeight);
   scrollerElement.style.width = $container[0].offsetWidth + 'px';
   scrollerElement.style.height = $container[0].offsetHeight + 'px';
 
   editors[activeTabID].refresh();
 
-  console.log(editors[activeTabID].doc.getValue().trim());
-  window.neoJSEngine.parser.parse(editors[activeTabID].doc.getValue());
+  // console.log(editors[activeTabID].doc.getValue().trim());
+  window.neo.parser.parse(editors[activeTabID].doc.getValue());
 
 };
 

@@ -35,12 +35,24 @@ button {
     margin-left: 3px;
 }
 
-#tab-content {
+#nde-editor {
     position: absolute;
     bottom: 300px;
     left: 0;
     right: 0;
     top: 32px;
+}
+
+#tab-content {
+    float: left;
+    width: 80vw;
+    height: 100%;
+}
+
+#opcode-data {
+    background-color: #abcdef;
+    width: auto;
+    height: 100%;
 }
 
 .CodeMirror {

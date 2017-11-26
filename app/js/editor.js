@@ -1,10 +1,13 @@
 let editor, menu;
+
+// Initialize defaults. Will load additional data from local storage if the program has been used before
 let editorTabData = {
   opts: {
     lastActiveTab: 0,
     currentActiveTab: 0,
   }
 };
+
 let editors = {};
 let minimumLines = 70;
 let autoSaveTimer;
@@ -42,10 +45,8 @@ onload = function () {
 $(function () {
   // localStorage.setItem('editorTabData', null);
   let previousData = loadEditorTabData();
-  if (previousData === 'null') {
-    console.log('prev data was null');
-    editorTabData = {};
-  } else {
+  if (previousData !== 'null') {
+    // If we have stored tab data, use it. Otherwise we don't set this and use the default above.
     editorTabData = JSON.parse(previousData);
   }
 

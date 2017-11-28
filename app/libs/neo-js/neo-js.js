@@ -21,26 +21,23 @@
  *      "acorn": "^5.1.1",
  *      "text-diff": "^1.0.1",
  */
+
 (function (window) {
   "use strict";
 
   const acorn = require('acorn');
-  const OpCodes = require(__dirname + "/libs/neo-vm/OpCode.js");
-  const opCodes = OpCodes.codes;
-  let ApplicationEngine = require(__dirname + "/libs/neo-vm/ApplicationEngine.js");
-  // let neovm = require(__dirname + '/libs/neo-vm/neo-vm');
+  const neoVM = require('neo-js-vm');
+  const opCodes = neoVM.OpCodes.codes;
   let Diff = require('text-diff');
 
   if (typeof(neo) === 'undefined') {
     // neo.init();
     window.neo = neoInit();
-  } else {
-    console.error('unable to initialise neojs');
   }
 
   function neoInit() {
     return {
-      OpCodes: OpCodes,
+      vm: neoVM,
       methods: {},
       stack: {},
       sourceNodes: {},
@@ -59,14 +56,18 @@
         neo.stack = {};
         neo.activeRange = {};
 
-        neo.sourceNodes = acorn.parse(jsSource, {
-          sourceType: "module",
-        });
+        try {
+          neo.sourceNodes = acorn.parse(jsSource, {
+            sourceType: "module",
+          });
 
-        this.ProcessSourceBody();
-        this.ProcessSourceToByteCode();
+          this.ProcessSourceBody();
+          this.ProcessSourceToByteCode();
 
-        this.TestApplicationEngine();
+          this.TestApplicationEngine();
+        } catch (ex) {
+          console.log('error parsing editor data: %s', ex.message);
+        }
       },
       TestApplicationEngine: function () {
         /*
@@ -82,8 +83,7 @@
          */
         console.log('---------------------------------------------------------------------------------');
         console.log(neo.byteCodeScript());
-        let appEngine = new ApplicationEngine('trigger', 'container', 'table', 'service', 'gas', true);
-        appEngine.CheckArraySize('asdf');
+        let appEngine = new neo.vm.ApplicationEngine('trigger', 'container', 'table', 'service', 'gas', true);
         let engine = appEngine.Run(neo.byteCodeScript(), null);
         console.log(appEngine);
         // appEngine.CheckArraySize();
@@ -157,12 +157,12 @@
           }
 
           byteCodeOutput.push(byteCode[n].code.replace('0x', ''));
-          // console.log(byteCode[n]);
+          // console.log(byteCode[n])
           // if(typeof(byteCode[n].range) !== 'undefined') {
           byteCodeRanges.push('<span class="bc-data" data-start={0} data-end={1} title="{2}">{3}</span>'.format(
             byteCode[n].range.start,
             byteCode[n].range.end,
-            (OpCodes.name(byteCode[n].code)).desc,
+            (neo.vm.OpCodes.name(byteCode[n].code)).desc,
             byteCode[n].code
             )
           );
